@@ -68,7 +68,7 @@ class VideoCreate(VideoBase):
 
 class Video(VideoBase):
     id: Optional[PyObjectId] = Field(alias="_id", default=None)
-    # uploader: PyObjectId
+    uploader: PyObjectId
     upload_date: datetime = Field(default_factory=datetime.utcnow)
     last_modified: Optional[datetime] = None
     views: int = 0

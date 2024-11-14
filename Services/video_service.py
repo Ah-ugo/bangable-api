@@ -35,7 +35,7 @@ def getVideoByTitle(title):
             raise HTTPException(status_code=404, detail=f"Video with title {title} not found")
 
 
-async def AddVideo(title: str, video: UploadFile, poster: UploadFile, description: str, category: str, tags: List[str]):
+async def AddVideo(title: str, video: UploadFile, poster: UploadFile, description: str, category: str, tags: List[str], uploader: str):
 
     video_url = await uploadVideoToCloud(video)
     poster_url = await uploadPosterToCloud(poster)
@@ -47,7 +47,8 @@ async def AddVideo(title: str, video: UploadFile, poster: UploadFile, descriptio
         "poster": poster_url,
         "description": description,
         "category": category,
-        "tags": tags
+        "tags": tags,
+        "uploader": ObjectId(uploader)
     }
 
 
@@ -58,17 +59,43 @@ async def AddVideo(title: str, video: UploadFile, poster: UploadFile, descriptio
 
     return get_inserted_video
 
-def UpdateVideo(id, body):
-    update_data = {k: v for k, v in body.dict().items() if v is not None}
+def UpdateVideo(id, body, current_user):
     vid_query = videos_db.find_one({"_id": ObjectId(id)})
 
-    if vid_query:
-        if "tags" not in update_data:
-            update_data["tags"] = vid_query.get("tags", [])
-        update_data["last_modified"] = datetime.utcnow()
-        videos_db.update_one({"_id": ObjectId(id)}, {"$set": update_data})
-        updated_vid = videos_db.find_one({"_id": ObjectId(id)})
-        updated_vid["_id"] = str(updated_vid["_id"])
-        return updated_vid
-    else:
+    if not vid_query:
         raise HTTPException(status_code=404, detail=f"Video with id {id} not found")
+
+
+    if str(vid_query["uploader"]) != str(current_user.id):
+        raise HTTPException(status_code=403, detail="You do not have permission to edit this video")
+
+
+    update_data = {k: v for k, v in body.dict().items() if v is not None}
+    if "tags" not in update_data:
+        update_data["tags"] = vid_query.get("tags", [])
+    update_data["last_modified"] = datetime.utcnow()
+
+    videos_db.update_one({"_id": ObjectId(id)}, {"$set": update_data})
+    updated_vid = videos_db.find_one({"_id": ObjectId(id)})
+    updated_vid["_id"] = str(updated_vid["_id"])
+    return updated_vid
+
+
+def deleteVideo(id, current_user):
+
+    vid_query = videos_db.find_one({"_id": ObjectId(id)})
+
+    if not vid_query:
+        raise HTTPException(status_code=404, detail=f"Video with id {id} not found")
+
+
+    if str(vid_query["uploader"]) != str(current_user.id):
+        raise HTTPException(status_code=403, detail="You do not have permission to delete this video")
+
+
+    del_query = videos_db.delete_one({"_id": ObjectId(id)})
+
+    if del_query.deleted_count == 1:
+        return {"message": f"Video with id {id} deleted successfully"}
+    else:
+        raise HTTPException(status_code=500, detail=f"Failed to delete video with id {id}")

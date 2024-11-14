@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from Routers import video_route
+from Routers import video_route, auth_route
 
 app = FastAPI(
     title="Bangable",
@@ -18,3 +18,4 @@ app.add_middleware(
 )
 
 app.include_router(video_route.router, prefix="/video", tags=["Videos"])
+app.include_router(auth_route.router, prefix="/user", tags=["Manage User"])
